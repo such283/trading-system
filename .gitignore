@@ -1,0 +1,31 @@
+# Build folders
+/build/
+cmake-build-debug/
+cmake-build-release/
+
+# CLion files
+.idea/
+*.iml
+
+# macOS
+.DS_Store
+
+# Compiled binaries
+*.out
+*.exe
+*.app
+
+# Object files / libraries
+*.o
+*.obj
+*.so
+*.dylib
+*.a
+
+# Logs
+*.log
+
+# Temporary files
+*~
+*.swp
+
