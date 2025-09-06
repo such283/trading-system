@@ -13,9 +13,9 @@ public:
     explicit Authentication(deribit::Config &config);
     bool authenticate();
 
-    std::string get_access_token();
-    bool is_authenticated();
-    void refresh_token();
+    std::string get_access_token() const;
+    bool is_authenticated() const;
+    void refresh_token() ;
 private:
     deribit::Config& config_;
     bool is_authenticated_;

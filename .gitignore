@@ -14,6 +14,7 @@ cmake-build-release/
 *.out
 *.exe
 *.app
+main
 
 # Object files / libraries
 *.o
@@ -28,4 +29,5 @@ cmake-build-release/
 # Temporary files
 *~
 *.swp
+.clang-tidy
 
