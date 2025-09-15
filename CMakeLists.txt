@@ -13,6 +13,10 @@ add_executable(trading
         src/Authentication.cpp
         include/websocket_server.hpp
         src/websocket_server.cpp
+        include/market_data.hpp
+        src/market_data.cpp
+        include/deribit_client.hpp
+        src/deribit_client.cpp
 )
 
 # Tell WebSocket++ to use standalone Asio
