@@ -5,17 +5,27 @@
 #include "market_data.hpp"
 #include <iostream>
 namespace deribit {
+
+    std::mutex &MarketData::get_mutex_for_symbol(const std::string &symbol) {
+        std::lock_guard<std::mutex>mtx(mutexes_map_mutex_);
+        if (orderbook_mutexes_.find(symbol)==orderbook_mutexes_.end()) {
+            orderbook_mutexes_[symbol] = std::make_unique<std::mutex>();
+        }
+        return *orderbook_mutexes_[symbol];
+    }
+
+
     void MarketData::register_orderbook_callback(OrderBookUpdateCallback callback) {
         std::lock_guard<std::mutex>lock(callbacks_mutex_);
         orderbook_callbacks_.push_back(callback);
     }
     Orderbook MarketData::get_orderbook(const std::string &symbol) {
-        std::lock_guard<std::mutex>lock(orderbooks_mutex_);
+        std::lock_guard<std::mutex>lock(get_mutex_for_symbol(symbol));
         auto it = orderbooks_.find(symbol);
         return (it != orderbooks_.end()) ? it->second : Orderbook();
     }
     void MarketData::on_orderbook_update(const std::string& symbol, const Json::Value& payload) {
-        std::lock_guard<std::mutex> lock(orderbooks_mutex_);
+        std::lock_guard<std::mutex>lock(callbacks_mutex_);
         if (!payload.isMember("params") || !payload["params"].isMember("data")) return;
         const Json::Value& data = payload["params"]["data"];
         int64_t update_ts = data.isMember("timestamp") ? data["timestamp"].asInt64() : 0;
@@ -113,6 +123,14 @@ namespace deribit {
                 }
             }
         }
+        if (!ob.bids.empty()) {
+            ob.best_bid_price = ob.bids.rbegin()->first;
+            ob.best_bid_amount = ob.bids.rbegin()->second;
+        }
+        if (!ob.asks.empty()) {
+            ob.best_ask_price = ob.asks.begin()->first;
+            ob.best_ask_amount = ob.asks.begin()->second;
+        }
     }
     void MarketData::apply_incremental_update(Orderbook& ob, const Json::Value& update_data) {
         ob.timestamp = update_data.get("timestamp", ob.timestamp).asInt64();
@@ -182,6 +200,14 @@ namespace deribit {
         }
         if (const Json::Value& val = update_data["best_ask_amount"]; !val.isNull()) {
             ob.best_ask_amount = val.asDouble();
+        }
+        if (!ob.bids.empty()) {
+            ob.best_bid_price = ob.bids.rbegin()->first;
+            ob.best_bid_amount = ob.bids.rbegin()->second;
+        }
+        if (!ob.asks.empty()) {
+            ob.best_ask_price = ob.asks.begin()->first;
+            ob.best_ask_amount = ob.asks.begin()->second;
         }
     }
 }

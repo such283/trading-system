@@ -33,10 +33,12 @@ namespace deribit {
         void on_orderbook_update(const std::string &symbol, const Json::Value &payload);
         Orderbook get_orderbook(const std::string &symbol);
     private:
+        std::mutex& get_mutex_for_symbol(const std::string& symbol);
         void parse_orderbook_update(const std::string& symbol, const Json::Value& json_data);
         void apply_incremental_update(Orderbook& ob, const Json::Value& update_data);
         std::map<std::string, Orderbook> orderbooks_;
-        std::mutex orderbooks_mutex_;
+        std::unordered_map<std::string, std::unique_ptr<std::mutex>> orderbook_mutexes_;
+        std::mutex mutexes_map_mutex_;
         std::vector<OrderBookUpdateCallback> orderbook_callbacks_;
         std::mutex callbacks_mutex_;
     };
