@@ -3,6 +3,7 @@
 #include <chrono>
 #include "./include/websocket_server.hpp"
 #include "./include/config.hpp"
+#include "./include/market_data.hpp"
 
 int main() {
     std::cout << " Starting WebSocket Server Test..." << std::endl;
@@ -33,7 +34,7 @@ int main() {
         std::cout << "   4. Check console for connection/message logs" << std::endl;
         std::cout << "\n Server will run for 60 seconds for testing..." << std::endl;
 
-        std::this_thread::sleep_for(std::chrono::seconds(60));
+        std::this_thread::sleep_for(std::chrono::seconds(600));
 
         std::cout << "\n Stopping server..." << std::endl;
         server.stop();
@@ -47,3 +48,4 @@ int main() {
 
     return 0;
 }
+//{"operation":"subscribe","symbol":"BTC-PERPETUAL"}
