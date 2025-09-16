@@ -178,7 +178,7 @@ namespace deribit {
                         std::string symbol = channel.substr(first_dot + 1, second_dot - first_dot - 1);
 
                         if (market_manager_) {
-                            market_manager_->on_orderbook_update(symbol, json);
+                            market_manager_->enqueue_orderbook_update(symbol, json);
                         }
                     }
                 }
