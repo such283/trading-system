@@ -17,6 +17,7 @@ add_executable(trading
         src/market_data.cpp
         include/deribit_client.hpp
         src/deribit_client.cpp
+        include/buffer.hpp
 )
 
 # Tell WebSocket++ to use standalone Asio
