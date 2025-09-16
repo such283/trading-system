@@ -11,8 +11,6 @@ find_package(jsoncpp REQUIRED)
 add_executable(trading
         main.cpp
         src/Authentication.cpp
-        include/websocket_server.hpp
-        src/websocket_server.cpp
         include/market_data.hpp
         src/market_data.cpp
         include/deribit_client.hpp

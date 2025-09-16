@@ -1,4 +1,3 @@
-#include "websocket_server.hpp"
 #include "market_data.hpp"
 #include "config.hpp"
 #include <iostream>
@@ -17,7 +16,7 @@ int main() {
         );
     deribit::MarketData market_data;
     deribit::DeribitClient deribit_client(config, &market_data);
-    deribit::WebsocketServer ws_server(config, &market_data);
+
 
     // Start Deribit connection
     deribit_client.connect();
@@ -29,10 +28,7 @@ int main() {
     deribit_client.subscribe("ETH-PERPETUAL");
     deribit_client.subscribe("BTC-PERPETUAL");
 
-    // Start WebSocket server
-    ws_server.run(8080);
 
-    // Keep running
     std::this_thread::sleep_for(std::chrono::hours(1));
 
     return 0;

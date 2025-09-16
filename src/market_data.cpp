@@ -14,18 +14,20 @@ namespace deribit {
         return *orderbook_mutexes_[symbol];
     }
 
-
-    void MarketData::register_orderbook_callback(OrderBookUpdateCallback callback) {
-        std::lock_guard<std::mutex>lock(callbacks_mutex_);
-        orderbook_callbacks_.push_back(callback);
-    }
+    // //this is for websocket client no longer needed
+    // void MarketData::register_orderbook_callback(OrderBookUpdateCallback callback) {
+    //     std::lock_guard<std::mutex>lock(callbacks_mutex_);
+    //     orderbook_callbacks_.push_back(callback);
+    // }
     Orderbook MarketData::get_orderbook(const std::string &symbol) {
         std::lock_guard<std::mutex>lock(get_mutex_for_symbol(symbol));
         auto it = orderbooks_.find(symbol);
         return (it != orderbooks_.end()) ? it->second : Orderbook();
     }
     void MarketData::on_orderbook_update(const std::string& symbol, const Json::Value& payload) {
-        std::lock_guard<std::mutex>lock(callbacks_mutex_);
+        //this is for websocket client no longer needed
+        // std::lock_guard<std::mutex>lock(callbacks_mutex_);
+
         if (!payload.isMember("params") || !payload["params"].isMember("data")) return;
         const Json::Value& data = payload["params"]["data"];
         int64_t update_ts = data.isMember("timestamp") ? data["timestamp"].asInt64() : 0;
@@ -42,9 +44,11 @@ namespace deribit {
                 apply_incremental_update(ob, data);
             }
         }
-        for (auto& cb : orderbook_callbacks_) {
-            cb(symbol, orderbooks_[symbol]);
-        }
+
+        //this is for websocket client no longer needed
+        // for (auto& cb : orderbook_callbacks_) {
+        //     cb(symbol, orderbooks_[symbol]);
+        // }
     }
     void MarketData::parse_orderbook_update(const std::string &symbol, const Json::Value &json_data) {
         const Json::Value* data_ptr;
@@ -102,7 +106,7 @@ namespace deribit {
                 const Json::Value& ask = asks[i];
                 if (ask.size() >= 2) {
                     if (ask.size() >= 3 && ask[0].isString()) {
-                        if (ask[0].asCString()[0] == 'd') { // "delete"
+                        if (ask[0].asCString()[0] == 'd') {
                             ob.asks.erase(ask[1].asDouble());
                         } else {
                             double amount = ask[2].asDouble();
@@ -131,6 +135,7 @@ namespace deribit {
             ob.best_ask_price = ob.asks.begin()->first;
             ob.best_ask_amount = ob.asks.begin()->second;
         }
+        std::cout<<"done"<< std::endl;
     }
     void MarketData::apply_incremental_update(Orderbook& ob, const Json::Value& update_data) {
         ob.timestamp = update_data.get("timestamp", ob.timestamp).asInt64();
@@ -209,5 +214,6 @@ namespace deribit {
             ob.best_ask_price = ob.asks.begin()->first;
             ob.best_ask_amount = ob.asks.begin()->second;
         }
+        std::cout<<"done"<< std::endl;
     }
 }

@@ -58,7 +58,7 @@ namespace deribit {
             }
         }
 
-        void register_orderbook_callback(OrderBookUpdateCallback callback);
+        // void register_orderbook_callback(OrderBookUpdateCallback callback);
         Orderbook get_orderbook(const std::string &symbol);
 
     private:
@@ -71,18 +71,17 @@ namespace deribit {
             }
         }
 
-        // --- Core update logic ---
         void on_orderbook_update(const std::string &symbol, const Json::Value &payload);
         std::mutex& get_mutex_for_symbol(const std::string& symbol);
         void parse_orderbook_update(const std::string& symbol, const Json::Value& json_data);
         void apply_incremental_update(Orderbook& ob, const Json::Value& update_data);
-
         std::map<std::string, Orderbook> orderbooks_;
         std::unordered_map<std::string, std::unique_ptr<std::mutex>> orderbook_mutexes_;
         std::mutex mutexes_map_mutex_;
 
-        std::vector<OrderBookUpdateCallback> orderbook_callbacks_;
-        std::mutex callbacks_mutex_;
+        //this is for websocket client no longer needed now
+        // std::vector<OrderBookUpdateCallback> orderbook_callbacks_;
+        // std::mutex callbacks_mutex_;
 
         Buffer<std::pair<std::string, Json::Value>> queue_;
         std::vector<std::thread> workers_;

@@ -178,6 +178,7 @@ namespace deribit {
                         std::string symbol = channel.substr(first_dot + 1, second_dot - first_dot - 1);
 
                         if (market_manager_) {
+                            std::cout<<"calling"<< std::endl;
                             market_manager_->enqueue_orderbook_update(symbol, json);
                         }
                     }
