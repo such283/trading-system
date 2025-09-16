@@ -28,6 +28,5 @@ namespace deribit {
         Config(const std::string& id, const std::string& secret, int port, const std::string& currency, const std::string& instrument, const std::vector<std::string>& instruments)
             : client_id(id), client_secret(secret), server{port}, trading{currency, instrument, instruments} {}
     };
-
 }
 #endif

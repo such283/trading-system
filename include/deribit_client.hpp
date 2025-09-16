@@ -15,7 +15,6 @@
 #include <atomic>
 
 namespace deribit {
-
     class DeribitClient {
     public:
         using client = websocketpp::client<websocketpp::config::asio_tls_client>;
@@ -45,5 +44,4 @@ namespace deribit {
         std::atomic<int> subscription_id_{1};
     };
 }
-
 #endif //DERIBIT_CLIENT_H
