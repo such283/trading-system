@@ -16,6 +16,8 @@ add_executable(trading
         include/deribit_client.hpp
         src/deribit_client.cpp
         include/buffer.hpp
+        include/order.hpp
+        src/order.cpp
 )
 
 # Tell WebSocket++ to use standalone Asio
