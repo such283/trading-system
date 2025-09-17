@@ -15,11 +15,12 @@ private:
     deribit::Config& config_;
     deribit::OrderManager& order_manager_;
     deribit::MarketData& market_data_;
+    deribit::DeribitClient* deribit_client_;
     std::vector<std::string> active_orders_;
 
 public:
-    TradingInterface(deribit::Config& config, deribit::OrderManager& om, deribit::MarketData& md)
-        : config_(config), order_manager_(om), market_data_(md) {}
+    TradingInterface(deribit::Config& config, deribit::OrderManager& om, deribit::MarketData& md, deribit::DeribitClient* client)
+        : config_(config), order_manager_(om), market_data_(md), deribit_client_(client) {}
 
     void show_menu() {
         std::cout << "\n" << std::string(50, '=') << std::endl;
@@ -34,7 +35,8 @@ public:
         std::cout << "6. Get orderbook" << std::endl;
         std::cout << "7. Get ticker" << std::endl;
         std::cout << "8. Get instruments" << std::endl;
-        std::cout << "9. Exit" << std::endl;
+        std::cout << "9. Subscribe to symbol" << std::endl;
+        std::cout << "10. Exit" << std::endl;
         std::cout << std::string(50, '=') << std::endl;
         std::cout << "Enter your choice (1-9): ";
     }
@@ -336,10 +338,21 @@ public:
         std::cout << "(Not implemented in current order manager)" << std::endl;
     }
 
+    void handle_coin_subscribe() {
+        std::cout<<"Enter the coin you want to subscribe"<< std::endl;
+        std::string symbol;
+        std::cin>>symbol;
+        if (deribit_client_) {
+            deribit_client_->subscribe(symbol);
+        } else {
+            std::cout << "Deribit client is not available!" << std::endl;
+        }
+    }
+
     void run() {
         int choice = 0;
 
-        while (choice != 9) {
+        while (choice != 10) {
             show_menu();
             std::cin >> choice;
 
@@ -369,14 +382,17 @@ public:
                     handle_get_instruments();
                     break;
                 case 9:
+                    handle_coin_subscribe();
+                    break;
+                case 10:
                     std::cout << "Exiting trading interface..." << std::endl;
                     break;
                 default:
-                    std::cout << "Invalid choice! Please enter 1-9." << std::endl;
+                    std::cout << "Invalid choice! Please enter 1-10." << std::endl;
                     break;
             }
 
-            if (choice != 9) {
+            if (choice != 10) {
                 std::cout << "\nPress Enter to continue...";
                 std::cin.ignore();
                 std::cin.get();
@@ -417,6 +433,7 @@ int main() {
         return -1;
     }
     std::cout << "WebSocket connected!" << std::endl;
+
     deribit::OrderManager order_manager(config, 4, 1024);
     std::cout << "Order manager initialized with async support!" << std::endl;
 
@@ -427,7 +444,8 @@ int main() {
     std::cout << "Authentication: Active" << std::endl;
     std::cout << std::string(60, '=') << std::endl;
 
-    TradingInterface interface(config, order_manager, market_data);
+    // Pass the deribit_client as a pointer to avoid const issues
+    TradingInterface interface(config, order_manager, market_data, &deribit_client);
     interface.run();
 
     std::cout << "\nShutting down trading system..." << std::endl;
