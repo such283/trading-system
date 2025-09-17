@@ -39,11 +39,11 @@ namespace deribit {
                 if (tail == head) {
                     return std::nullopt;
                 }
-
+                T value = buffer_[tail];
                 if (tail_.compare_exchange_weak(tail, (tail + 1) % capacity_,
                                                std::memory_order_acq_rel,
                                                std::memory_order_acquire)) {
-                    return buffer_[tail];
+                    return value;
                                                }
             }
         }
