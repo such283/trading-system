@@ -15,6 +15,9 @@ namespace deribit {
     }
 
     Orderbook MarketData::get_orderbook(const std::string &symbol) {
+        //bug here need to acquire the map mutex before accessing symbol mutex
+        //will try to implement lock free on sunday for market data
+        // if unable to do will fix this bug
         std::lock_guard<std::mutex> lock(get_mutex_for_symbol(symbol));
         auto it = orderbooks_.find(symbol);
         return (it != orderbooks_.end()) ? it->second : Orderbook();
