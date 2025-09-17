@@ -20,28 +20,34 @@ namespace deribit {
         explicit Buffer(size_t capacity) : capacity_(capacity),buffer_(capacity),head_(0), tail_(0) {
 
         }
-        bool push(const T& item ) {
+        bool push(const T& item) {
             size_t head = head_.load(std::memory_order_relaxed);
-            size_t next_head = (head+1)%capacity_;
-            if (next_head==tail_.load(std::memory_order_acquire)) {
+            size_t next_head = (head + 1) % capacity_;
+            if (next_head == tail_.load(std::memory_order_acquire)) {
                 return false;
             }
             buffer_[head] = item;
             head_.store(next_head, std::memory_order_release);
             return true;
         }
+
         std::optional<T> pop() {
-            size_t tail = tail_.load(std::memory_order_relaxed);
+            while (true) {
+                size_t tail = tail_.load(std::memory_order_acquire);
+                size_t head = head_.load(std::memory_order_acquire);
 
-            if (tail == head_.load(std::memory_order_acquire)) {
-                // Buffer empty
-                return std::nullopt;
+                if (tail == head) {
+                    return std::nullopt;
+                }
+
+                if (tail_.compare_exchange_weak(tail, (tail + 1) % capacity_,
+                                               std::memory_order_acq_rel,
+                                               std::memory_order_acquire)) {
+                    return buffer_[tail];
+                                               }
             }
-
-            T item = buffer_[tail];
-            tail_.store((tail + 1) % capacity_, std::memory_order_release);
-            return item;
         }
+
     };
 }
 
