@@ -1,4 +1,4 @@
-# High-Frequency Trading System
+# Trading System
 
 A low-latency C++ trading system for processing real-time market data from Deribit cryptocurrency exchange.
 
