@@ -161,3 +161,4 @@ This isn't production-ready HFT code (see limitations above), but it taught me h
 
 
 **Author:** Supradeep Chitumalla  
+**Linkedin:** https://www.linkedin.com/in/supradeep-c/
