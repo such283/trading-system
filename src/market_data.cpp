@@ -293,5 +293,6 @@ namespace deribit {
                 ob.best_ask_amount = 0.0;
             }
         }
+
     }
 }
