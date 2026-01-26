@@ -272,6 +272,6 @@ namespace deribit {
             }
         }
 
-        std::cout << "Incremental update applied for " << ob.instrument_name << std::endl;
+
     }
 }
