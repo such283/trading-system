@@ -1,5 +1,6 @@
 #include "market_data.hpp"
 #include "config.hpp"
+#include "config_loader.hpp"
 #include "deribit_client.hpp"
 #include "order.hpp"
 #include "authentication.hpp"
@@ -38,7 +39,7 @@ public:
         std::cout << "9. Subscribe to symbol" << std::endl;
         std::cout << "10. Exit" << std::endl;
         std::cout << std::string(50, '=') << std::endl;
-        std::cout << "Enter your choice (1-9): ";
+        std::cout << "Enter your choice (1-10): ";
     }
 
     void handle_buy_order() {
@@ -97,10 +98,9 @@ public:
             order_params.callback = [this](const std::string& order_id, bool success) {
                 if (success) {
                     active_orders_.push_back(order_id);
-                    std::cout << "\nAsync buy order completed!" << std::endl;
-                    std::cout << "Order ID: " << order_id << std::endl;
+                    std::cout << "\n[ASYNC] Buy order completed! Order ID: " << order_id << std::endl;
                 } else {
-                    std::cout << "\nAsync buy order failed!" << std::endl;
+                    std::cout << "\n[ASYNC] Buy order failed!" << std::endl;
                 }
             };
 
@@ -172,10 +172,9 @@ public:
             order_params.callback = [this](const std::string& order_id, bool success) {
                 if (success) {
                     active_orders_.push_back(order_id);
-                    std::cout << "\nAsync sell order completed!" << std::endl;
-                    std::cout << "Order ID: " << order_id << std::endl;
+                    std::cout << "\n[ASYNC] Sell order completed! Order ID: " << order_id << std::endl;
                 } else {
-                    std::cout << "\nAsync sell order failed!" << std::endl;
+                    std::cout << "\n[ASYNC] Sell order failed!" << std::endl;
                 }
             };
 
@@ -339,9 +338,9 @@ public:
     }
 
     void handle_coin_subscribe() {
-        std::cout<<"Enter the coin you want to subscribe"<< std::endl;
+        std::cout << "Enter the symbol to subscribe (e.g., BTC-PERPETUAL): ";
         std::string symbol;
-        std::cin>>symbol;
+        std::cin >> symbol;
         if (deribit_client_) {
             deribit_client_->subscribe(symbol);
         } else {
@@ -401,26 +400,38 @@ public:
     }
 };
 
-int main() {
-    deribit::Config config(
-        "b9sGBzh-",
-        "aeemSZ5UuPKk5_OebSDc8oLK3-eHTe8F7yXBb5pRa04",
-        8080,
-        "BTC",
-        "BTC-PERPETUAL",
-        {"BTC-PERPETUAL", "ETH-PERPETUAL"}
-    );
+int main(int argc, char* argv[]) {
+    // Determine config file path
+    std::string config_path = "config.json";
+    if (argc > 1) {
+        config_path = argv[1];
+    }
 
     std::cout << "Starting Deribit Trading System..." << std::endl;
+    std::cout << "Loading configuration from: " << config_path << std::endl;
 
+    // Load configuration from file
+    deribit::Config config;
+    try {
+        config = deribit::ConfigLoader::load_from_file(config_path);
+        std::cout << "Configuration loaded successfully!" << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Failed to load configuration: " << e.what() << std::endl;
+        std::cerr << "\nPlease ensure config.json exists and contains valid credentials." << std::endl;
+        std::cerr << "You can create it from the template or pass a custom path: ./trading <config_path>" << std::endl;
+        return -1;
+    }
+
+    // Authenticate
     derbit::Authentication auth(config);
     std::cout << "Authenticating..." << std::endl;
     if (!auth.authenticate()) {
-        std::cerr << "Authentication failed!" << std::endl;
+        std::cerr << "Authentication failed! Please check your credentials in config.json" << std::endl;
         return -1;
     }
     std::cout << "Authentication successful!" << std::endl;
 
+    // Initialize market data and WebSocket client
     deribit::MarketData market_data;
     deribit::DeribitClient deribit_client(config, &market_data);
 
@@ -434,8 +445,8 @@ int main() {
     }
     std::cout << "WebSocket connected!" << std::endl;
 
+    // Initialize order manager
     deribit::OrderManager order_manager(config, 4, 1024);
-    std::cout << "Order manager initialized with async support!" << std::endl;
 
     std::cout << "\n" << std::string(60, '=') << std::endl;
     std::cout << "SYSTEM READY FOR TRADING!" << std::endl;
@@ -444,10 +455,11 @@ int main() {
     std::cout << "Authentication: Active" << std::endl;
     std::cout << std::string(60, '=') << std::endl;
 
-    // Pass the deribit_client as a pointer to avoid const issues
+    // Run trading interface
     TradingInterface interface(config, order_manager, market_data, &deribit_client);
     interface.run();
 
+    // Shutdown
     std::cout << "\nShutting down trading system..." << std::endl;
     deribit_client.disconnect();
     std::cout << "System shutdown complete. Goodbye!" << std::endl;

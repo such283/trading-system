@@ -18,6 +18,7 @@ add_executable(trading
         include/buffer.hpp
         include/order.hpp
         src/order.cpp
+        include/config_loader.hpp
 )
 
 # Tell WebSocket++ to use standalone Asio

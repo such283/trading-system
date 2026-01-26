@@ -21,12 +21,15 @@ namespace deribit {
 
         struct Trading {
             std::string default_currency;
-            std::string default_instrument; // Add this line
-            std::vector<std::string> supported_instruments;
+            std::string default_instrument;
         } trading;
 
-        Config(const std::string& id, const std::string& secret, int port, const std::string& currency, const std::string& instrument, const std::vector<std::string>& instruments)
-            : client_id(id), client_secret(secret), server{port}, trading{currency, instrument, instruments} {}
+        // Default constructor
+        Config() : server{8080}, trading{"BTC", "BTC-PERPETUAL"} {}
+
+        // Parameterized constructor
+        Config(const std::string& id, const std::string& secret, int port, const std::string& currency, const std::string& instrument)
+            : client_id(id), client_secret(secret), server{port}, trading{currency, instrument} {}
     };
 }
 #endif
