@@ -1,164 +1,196 @@
-# Trading System
+# Low-Latency Trading System
 
-A low-latency C++ trading system for processing real-time market data from Deribit cryptocurrency exchange.
+A C++ trading system that connects to Deribit exchange via WebSocket and processes market data with ~107μs average latency.
+
+Built to learn about lock-free data structures, concurrent programming, and low-latency systems.
+
+## What It Does
+
+- Streams real-time orderbook data from Deribit (cryptocurrency exchange)
+- Processes updates using lock-free queue and 4 worker threads
+- Places/cancels/modifies orders via REST API
+- Tracks positions and measures processing latency
 
 ## Architecture
 
-**Core Design Principles:**
-- Lock-free data structures to minimize contention
-- Multi-threaded worker pool for parallel order book processing
-- Separation of I/O (WebSocket) and compute (order book updates)
-- Cache-aware memory layout to avoid false sharing
-
-### System Components
-
 ```
-WebSocket Client → Lock-Free Buffer → Worker Pool → Order Book Manager
-                                   ↓
-                            Order Manager (HTTP)
+WebSocket → Lock-Free Queue (65k capacity) → 4 Workers → Per-Symbol Orderbooks
+                                                              ↓
+                                                        Order Manager
 ```
 
-**Message Flow:**
-1. WebSocket receives market data (50K+ messages/second)
-2. Messages enqueued to lock-free circular buffer
-3. Worker threads process updates in parallel
-4. Order book maintains bid/ask state per instrument
+**Key Design Choices:**
+- Lock-free circular buffer with cache-line alignment (prevents false sharing)
+- Move semantics to avoid JSON copy overhead 
+- Per-symbol mutexes (BTC and ETH can update in parallel)
+- Atomic counters for dropped messages and latency tracking
 
-## Performance Characteristics
+**Measured Performance:**
+- Average latency: ~107 microseconds (orderbook update)
+- Breakdown: JSON parsing (60-80μs) + map update (20-30μs) + mutex (5-10μs)
 
-**Throughput:** 50,000+ messages/second across Spot, Futures, Options  
-**Latency:** Sub-millisecond order book updates (when not I/O bound)  
-**Concurrency:** 4 worker threads (configurable)  
-**Buffer Capacity:** 65,536 messages (lock-free queue)
+## Project Structure
 
-## Technical Highlights
-
-### 1. Lock-Free Circular Buffer
-
-```cpp
-template<typename T>
-class Buffer {
-private:
-    alignas(64) std::atomic<size_t> head_;  // Cache line alignment
-    alignas(64) std::atomic<size_t> tail_;  // Prevents false sharing
-    // ...
-};
 ```
-
-**Key Features:**
-- **Acquire-release memory ordering** for correctness without sequential consistency overhead
-- **Cache line alignment** (`alignas(64)`) to prevent false sharing between producer/consumer
-- **Lock-free** single-producer, multi-consumer design
-
-**Design Choice:** Used `acquire-release` instead of `seq_cst` because we only need ordering guarantees between producer and consumer threads, not global ordering across all threads.
-
-### 2. Multi-Threaded Order Book Processing
-
-**Architecture:**
-- Per-symbol mutexes to allow parallel updates to different instruments
-- Worker pool pattern: dequeue → parse → update order book
-- Incremental updates (deltas) + periodic snapshots for bandwidth efficiency
-
-**Handles:**
-- Snapshot messages (full order book state)
-- Incremental updates (bid/ask changes)
-- Out-of-order message detection via timestamps
-
-### 3. WebSocket Integration
-
-- Asynchronous WebSocket client using `websocketpp`
-- JSON parsing with `jsoncpp`
-- Subscription management for multiple instruments
-- Automatic reconnection handling
-
-## Known Limitations & Future Work
-
-### Current Issues
-
-**1. Race Condition in Mutex Management** (Documented in `market_data.cpp:13-15`)
-```cpp
-// Bug: accessing orderbook_mutexes_ without holding mutexes_map_mutex_
-// This can cause crashes under high contention
+trading-system/
+├── CMakeLists.txt
+├── config.json              # replace your API credentials create a file named config.json
+├── main.cpp                 
+├── README.md
+├── include/
+│   ├── authentication.hpp
+│   ├── buffer.hpp           # Lock-free circular buffer
+│   ├── config.hpp
+│   ├── config_loader.hpp
+│   ├── deribit_client.hpp   # WebSocket client
+│   ├── market_data.hpp      # Orderbook manager + latency tracking
+│   └── order.hpp            # REST API for orders
+├── src/
+│   ├── Authentication.cpp
+│   ├── deribit_client.cpp
+│   ├── market_data.cpp
+│   └── order.cpp
 ```
-**Fix:** Acquire map mutex before accessing symbol mutex, or replace with lock-free hash map.
-
-**2. Order Book Copy Overhead**
-- `get_orderbook()` returns by value, copying entire `std::map<double, double>`
-- For deep order books (100+ levels), this is expensive
-- **Solution:** Use `shared_ptr` with RCU pattern or return const reference
-
-**3. std::map for Price Levels**
-- Red-black tree has O(log n) insert/lookup
-- Better: `std::vector` with binary search (cache-friendly) or custom array-based levels
-
-### Production TODOs
-
-- [ ] Lock-free hash map for per-symbol mutexes
-- [ ] Zero-copy order book access (shared_ptr + RCU)
-- [ ] Replace `std::map` with array-based price levels
-- [ ] Add latency monitoring (RDTSC timestamps, p99 metrics)
-- [ ] Backpressure handling when buffer is full
-
-
-## What I Learned
-
-**Memory Ordering:**  
-Understanding when `acquire-release` is sufficient vs. when you need `seq_cst`. The performance difference matters at high message rates.
-
-**False Sharing:**  
-Cache line alignment (`alignas(64)`) on atomic variables prevents CPU cache thrashing when producer/consumer run on different cores. Measured ~2x throughput improvement.
-
-**Latency vs. Throughput Trade-offs:**
-- Lock-free structures reduce tail latency but complicate the code
-- Worker pool increases throughput but adds queue latency
-- Copying order books is safe but slow; zero-copy is fast but needs careful lifetime management
-
-**Debugging Concurrent Systems:**
-- ThreadSanitizer caught the mutex race condition
-- Understanding happens-before relationships is critical
-- Reproducing race conditions requires stress testing under load
 
 ## Build & Run
 
-**Dependencies:**
-```bash
-# Ubuntu/Debian
-sudo apt-get install libwebsocketpp-dev libjsoncpp-dev libcpprest-dev libssl-dev
+### Prerequisites
 
-# macOS
-brew install websocketpp jsoncpp cpprestsdk openssl
+**macOS:**
+```bash
+brew install cmake openssl cpprestsdk jsoncpp websocketpp
 ```
 
-**Build:**
+**Ubuntu/Debian:**
 ```bash
+sudo apt-get install cmake build-essential libssl-dev libcpprest-dev \
+    libjsoncpp-dev libwebsocketpp-dev
+```
+
+### Get Deribit API Credentials
+
+1. Go to https://test.deribit.com (testnet!)
+2. Create account
+3. Account → API → Create new key
+4. Copy `client_id` and `client_secret`
+
+### Build
+
+```bash
+git clone https://github.com/such283/trading-system
+cd trading-system
+
+# Create config file
+cat > config.json << EOF
+{
+  "client_id": "YOUR_CLIENT_ID",
+  "client_secret": "YOUR_CLIENT_SECRET"
+}
+EOF
+
+# Build 
 mkdir build && cd build
 cmake ..
-make -j4
+make
+
+# Run
+./trading
 ```
 
-**Run:**
-```bash
-./deribit_trader
+## Usage
+
+```
+==================================================
+DERIBIT TRADING INTERFACE
+==================================================
+Available commands:
+1. Place buy order
+2. Place sell order
+3. Cancel order
+4. Modify order
+5. Get positions
+6. Get orderbook
+7. View latency metrics
+8. Subscribe to symbol
+9. Exit
+==================================================
 ```
 
-**Configuration:**  
-Edit `config.json` to set API credentials and subscriptions.
+**Typical workflow:**
 
+1. Subscribe to market data: `8 → BTC-PERPETUAL`
+2. View orderbook: `6 → BTC-PERPETUAL`
+3. Check latency: `7` (shows avg processing time)
+4. Place order: `1 → BTC-PERPETUAL → 10 → limit → 87000 → async`
+5. Check positions: `5 → BTC → future`
 
-## Why I did this ?
+## Known Issues & Limitations
+### 1. Performance Bottlenecks
+- **JSON parsing (60-80μs)**: Using jsoncpp which is slow. Could use simdjson (10x faster)
+- **std::map for orderbook**: O(log n) operations. Could use fixed arrays for better cache locality
+- **Copies on get_orderbook()**: Returns by value. Could use shared_ptr with RCU
 
-I wanted to understand low-latency systems at a fundamental level:
-- How does memory ordering affect correctness in lock-free code?
-- What are the real bottlenecks in concurrent data structures?
-- When should you sacrifice simplicity for performance?
+### 2. Things I'd Fix for Production
+- Replace jsoncpp with simdjson
+- Lock-free orderbook (no mutexes at all)
+- CPU pinning for worker threads
+- Pre-allocated memory pools
+- Latency histograms (not just average)
 
-This isn't production-ready HFT code (see limitations above), but it taught me how to think about:
-- Cache behavior and memory layout
-- Lock-free algorithm correctness
-- Performance profiling under load
-- Debugging race conditions
+## What I Learned
 
+**Memory Ordering:**
+Used `memory_order_relaxed` for counters (don't need synchronization) vs `memory_order_acquire/release` for queue operations (need ordering guarantees).
 
+**Cache-Line Alignment:**
+```cpp
+alignas(64) std::atomic<size_t> write_pos_;  // Separate cache line
+alignas(64) std::atomic<size_t> read_pos_;   // Prevents false sharing
+```
+Without this, producer and consumer thrash the same cache line. ~2x performance difference.
 
-**Author:** Supradeep Chitumalla  
-**Linkedin:** https://www.linkedin.com/in/supradeep-c/
+**Move Semantics:**
+Changed from copying Json::Value (5-20μs) to moving (0.1μs). Simple optimization, huge impact.
+
+**Concurrency is Hard:**
+Found race condition only after careful code review. ThreadSanitizer helps but doesn't catch everything.
+
+## Technical Details
+
+### Lock-Free Queue
+```cpp
+template<typename T>
+class Buffer {
+    alignas(64) std::atomic<size_t> write_pos_;
+    alignas(64) std::atomic<size_t> read_pos_;
+    std::vector<T> buffer_;
+    
+    bool push(T&& item) {
+        size_t current_write = write_pos_.load(std::memory_order_relaxed);
+        // ... check if full ...
+        buffer_[current_write] = std::move(item);
+        write_pos_.store(next_write, std::memory_order_release);
+    }
+};
+```
+
+### Latency Tracking
+```cpp
+auto start = std::chrono::high_resolution_clock::now();
+this->on_orderbook_update(symbol, json);
+auto end = std::chrono::high_resolution_clock::now();
+auto duration_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+```
+
+## Why This Project?
+
+I wanted to understand:
+- How lock-free data structures actually work in practice
+- When to use atomics vs mutexes
+- What "low-latency" really means (turns out 100μs is fast for this use case)
+- How to measure and optimize performance
+
+## Author
+
+Supradeep Chitumalla  
+LinkedIn: https://www.linkedin.com/in/supradeep-c/

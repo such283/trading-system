@@ -34,12 +34,11 @@ public:
         std::cout << "4. Modify order" << std::endl;
         std::cout << "5. Get positions" << std::endl;
         std::cout << "6. Get orderbook" << std::endl;
-        std::cout << "7. Get ticker" << std::endl;
-        std::cout << "8. Get instruments" << std::endl;
-        std::cout << "9. Subscribe to symbol" << std::endl;
-        std::cout << "10. Exit" << std::endl;
+        std::cout << "7. View latency metrics" << std::endl;
+        std::cout << "8. Subscribe to symbol" << std::endl;
+        std::cout << "9. Exit" << std::endl;
         std::cout << std::string(50, '=') << std::endl;
-        std::cout << "Enter your choice (1-10): ";
+        std::cout << "Enter your choice (1-9): ";
     }
 
     void handle_buy_order() {
@@ -108,8 +107,7 @@ public:
             bool queued = order_manager_.submit_order_async(std::move(order_params));
 
             if (queued) {
-                std::cout << "Order queued successfully! You'll be notified when it completes." << std::endl;
-                std::cout << "Pending orders in queue: " << order_manager_.pending_orders() << std::endl;
+                std::cout << "Order queued successfully!" << std::endl;
             } else {
                 std::cout << "Failed to queue order (buffer might be full)" << std::endl;
             }
@@ -182,8 +180,7 @@ public:
             bool queued = order_manager_.submit_order_async(std::move(order_params));
 
             if (queued) {
-                std::cout << "Order queued successfully! You'll be notified when it completes." << std::endl;
-                std::cout << "Pending orders in queue: " << order_manager_.pending_orders() << std::endl;
+                std::cout << "Order queued successfully!" << std::endl;
             } else {
                 std::cout << "Failed to queue order (buffer might be full)" << std::endl;
             }
@@ -323,18 +320,11 @@ public:
             double spread_pct = (spread / orderbook.best_bid_price) * 100;
             std::cout << "Spread: " << spread << " (" << std::setprecision(4) << spread_pct << "%)" << std::endl;
         }
-    }
 
-    void handle_get_ticker() {
-        std::cout << "\nGET TICKER" << std::endl;
-        std::cout << "This would fetch ticker data from Deribit API." << std::endl;
-        std::cout << "(Not implemented in current order manager)" << std::endl;
-    }
-
-    void handle_get_instruments() {
-        std::cout << "\nGET INSTRUMENTS" << std::endl;
-        std::cout << "This would fetch available instruments from Deribit API." << std::endl;
-        std::cout << "(Not implemented in current order manager)" << std::endl;
+        size_t dropped = market_data_.get_dropped_message_count();
+        if (dropped > 0) {
+            std::cout << "⚠️  Dropped messages: " << dropped << std::endl;
+        }
     }
 
     void handle_coin_subscribe() {
@@ -348,10 +338,15 @@ public:
         }
     }
 
+    void handle_view_latency() {
+        std::cout << "\nLATENCY METRICS" << std::endl;
+        market_data_.print_latency_stats();
+    }
+
     void run() {
         int choice = 0;
 
-        while (choice != 10) {
+        while (choice != 9) {
             show_menu();
             std::cin >> choice;
 
@@ -375,23 +370,20 @@ public:
                     handle_get_orderbook();
                     break;
                 case 7:
-                    handle_get_ticker();
+                    handle_view_latency();
                     break;
                 case 8:
-                    handle_get_instruments();
-                    break;
-                case 9:
                     handle_coin_subscribe();
                     break;
-                case 10:
+                case 9:
                     std::cout << "Exiting trading interface..." << std::endl;
                     break;
                 default:
-                    std::cout << "Invalid choice! Please enter 1-10." << std::endl;
+                    std::cout << "Invalid choice! Please enter 1-9." << std::endl;
                     break;
             }
 
-            if (choice != 10) {
+            if (choice != 9) {
                 std::cout << "\nPress Enter to continue...";
                 std::cin.ignore();
                 std::cin.get();
@@ -401,7 +393,6 @@ public:
 };
 
 int main(int argc, char* argv[]) {
-    // Determine config file path
     std::string config_path = "config.json";
     if (argc > 1) {
         config_path = argv[1];
@@ -410,28 +401,23 @@ int main(int argc, char* argv[]) {
     std::cout << "Starting Deribit Trading System..." << std::endl;
     std::cout << "Loading configuration from: " << config_path << std::endl;
 
-    // Load configuration from file
     deribit::Config config;
     try {
         config = deribit::ConfigLoader::load_from_file(config_path);
         std::cout << "Configuration loaded successfully!" << std::endl;
     } catch (const std::exception& e) {
         std::cerr << "Failed to load configuration: " << e.what() << std::endl;
-        std::cerr << "\nPlease ensure config.json exists and contains valid credentials." << std::endl;
-        std::cerr << "You can create it from the template or pass a custom path: ./trading <config_path>" << std::endl;
         return -1;
     }
 
-    // Authenticate
     derbit::Authentication auth(config);
     std::cout << "Authenticating..." << std::endl;
     if (!auth.authenticate()) {
-        std::cerr << "Authentication failed! Please check your credentials in config.json" << std::endl;
+        std::cerr << "Authentication failed!" << std::endl;
         return -1;
     }
     std::cout << "Authentication successful!" << std::endl;
 
-    // Initialize market data and WebSocket client
     deribit::MarketData market_data;
     deribit::DeribitClient deribit_client(config, &market_data);
 
@@ -445,7 +431,6 @@ int main(int argc, char* argv[]) {
     }
     std::cout << "WebSocket connected!" << std::endl;
 
-    // Initialize order manager
     deribit::OrderManager order_manager(config, 4, 1024);
 
     std::cout << "\n" << std::string(60, '=') << std::endl;
@@ -455,11 +440,9 @@ int main(int argc, char* argv[]) {
     std::cout << "Authentication: Active" << std::endl;
     std::cout << std::string(60, '=') << std::endl;
 
-    // Run trading interface
     TradingInterface interface(config, order_manager, market_data, &deribit_client);
     interface.run();
 
-    // Shutdown
     std::cout << "\nShutting down trading system..." << std::endl;
     deribit_client.disconnect();
     std::cout << "System shutdown complete. Goodbye!" << std::endl;

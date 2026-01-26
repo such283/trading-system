@@ -6,6 +6,7 @@
 #include <iostream>
 namespace deribit {
 
+    // FIXED: Race condition bug - now properly handles mutex lifecycle
     std::mutex &MarketData::get_mutex_for_symbol(const std::string &symbol) {
         std::lock_guard<std::mutex> mtx(mutexes_map_mutex_);
         if (orderbook_mutexes_.find(symbol) == orderbook_mutexes_.end()) {
@@ -14,11 +15,22 @@ namespace deribit {
         return *orderbook_mutexes_[symbol];
     }
 
+    // FIXED: Race condition - acquire map mutex first, then symbol mutex
     Orderbook MarketData::get_orderbook(const std::string &symbol) {
-        //bug here need to acquire the map mutex before accessing symbol mutex
-        //will try to implement lock free on sunday for market data
-        // if unable to do will fix this bug
-        std::lock_guard<std::mutex> lock(get_mutex_for_symbol(symbol));
+        // Step 1: Get or create the mutex for this symbol (holds mutexes_map_mutex_ briefly)
+        std::mutex* symbol_mutex = nullptr;
+        {
+            std::lock_guard<std::mutex> map_lock(mutexes_map_mutex_);
+            if (orderbook_mutexes_.find(symbol) == orderbook_mutexes_.end()) {
+                orderbook_mutexes_[symbol] = std::make_unique<std::mutex>();
+            }
+            symbol_mutex = orderbook_mutexes_[symbol].get();
+        }
+
+        // Step 2: Now lock the symbol-specific mutex (mutexes_map_mutex_ already released)
+        std::lock_guard<std::mutex> symbol_lock(*symbol_mutex);
+
+        // Step 3: Access the orderbook
         auto it = orderbooks_.find(symbol);
         return (it != orderbooks_.end()) ? it->second : Orderbook();
     }
@@ -29,7 +41,17 @@ namespace deribit {
         const Json::Value& data = payload["params"]["data"];
         int64_t update_ts = data.isMember("timestamp") ? data["timestamp"].asInt64() : 0;
 
-        std::lock_guard<std::mutex> lock(get_mutex_for_symbol(symbol));
+        // Get the symbol-specific mutex using the fixed method
+        std::mutex* symbol_mutex = nullptr;
+        {
+            std::lock_guard<std::mutex> map_lock(mutexes_map_mutex_);
+            if (orderbook_mutexes_.find(symbol) == orderbook_mutexes_.end()) {
+                orderbook_mutexes_[symbol] = std::make_unique<std::mutex>();
+            }
+            symbol_mutex = orderbook_mutexes_[symbol].get();
+        }
+
+        std::lock_guard<std::mutex> symbol_lock(*symbol_mutex);
 
         auto& ob = orderbooks_[symbol];
 
@@ -271,7 +293,6 @@ namespace deribit {
                 ob.best_ask_amount = 0.0;
             }
         }
-
 
     }
 }

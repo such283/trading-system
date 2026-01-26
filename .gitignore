@@ -32,3 +32,5 @@ main
 .clang-tidy
 
 config.json
+
+external/
